@@ -33,22 +33,33 @@
             sourceWatcher.EnableRaisingEvents = true;
         }   
 
-        void OnSourceChanged(object sender, FileSystemEventArgs e)
-        {
-            queueOperations.AddFirst(e);
-            Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
-        }
-
         void OnSourceRenamed(object sender, RenamedEventArgs e)
         {
-            queueOperations.AddFirst(e);
             Console.WriteLine($"Source file renamed from {e.OldFullPath} to {e.FullPath}");
+            LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.First;
+            while (currentNode != null)
+            {
+                FileSystemEventArgs current = currentNode.Value;
+                if (current.ChangeType == WatcherChangeTypes.Created && current.FullPath == e.OldFullPath)
+                {
+                    currentNode.Value = e;
+                    return;
+                }
+                currentNode = currentNode.Next;
+            }
+            queueOperations.AddFirst(e);
         }
 
         void OnSourceCreated(object sender, FileSystemEventArgs e)
         {
             queueOperations.AddFirst(e);
             Console.WriteLine($"Source file created: {e.FullPath}");
+        }
+
+        void OnSourceChanged(object sender, FileSystemEventArgs e)
+        {
+            queueOperations.AddFirst(e);
+            Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
         }
 
         void OnSourceDeleted(object sender, FileSystemEventArgs e)
@@ -103,7 +114,8 @@
 
         void RenameFile(RenamedEventArgs operation, string destinationRootPath)
         {
-            File.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
+            if (!File.Exists(destinationRootPath)) File.Create(destinationRootPath.File(operation.Name)).Close();
+            else File.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
         }
         internal int GetSynchronizationInterval()
         {

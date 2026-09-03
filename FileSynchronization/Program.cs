@@ -13,6 +13,18 @@ class Program
         }
         
         Console.WriteLine("Arguments received from command line, starting synchronization process...");
+        InitializeSynchronizer(commandLineArguments);
         return 0;
+    }
+
+    internal static void InitializeSynchronizer(CommandLineArguments arguments)
+    {
+        FileSynchronizer synchronizer = new(arguments);
+        for(;;)
+        {
+            Console.WriteLine("Synchronizing...");
+            synchronizer.Synchronize();
+            synchronizer.Rest();
+        }
     }
 }

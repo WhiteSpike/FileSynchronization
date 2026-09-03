@@ -39,6 +39,7 @@
                                  | NotifyFilters.LastWrite
                                  | NotifyFilters.Security
                                  | NotifyFilters.Size;
+
             sourceWatcher.Created += OnSourceCreated;
             sourceWatcher.Changed += OnSourceChanged;
             sourceWatcher.Deleted += OnSourceDeleted;
@@ -50,37 +51,47 @@
         void OnSourceRenamed(object sender, RenamedEventArgs e)
         {
             Console.WriteLine($"Source file renamed from {e.OldFullPath} to {e.FullPath}");
-            LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.First;
+            LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.Last;
             while (currentNode != null)
             {
                 FileSystemEventArgs current = currentNode.Value;
-                if (current.ChangeType == WatcherChangeTypes.Created && current.Name == e.OldName)
+                if (current.Name != e.OldName) continue;
+                    switch (current.ChangeType)
                 {
-                    currentNode.Value = new FileSystemEventArgs(current.ChangeType, GetSourcePath(), e.Name);
-                    return;
+                    case WatcherChangeTypes.Created:
+                        {
+                            currentNode.Value = new FileSystemEventArgs(current.ChangeType, GetSourcePath(), e.Name);
+                            return;
+                        }
+                    case WatcherChangeTypes.Renamed:
+                        {
+                            RenamedEventArgs currentRenamed = current as RenamedEventArgs;
+                            currentNode.Value = new RenamedEventArgs(current.ChangeType, GetSourcePath(), e.Name, currentRenamed.OldName);
+                            return;
+                        }
                 }
-                currentNode = currentNode.Next;
+                currentNode = currentNode.Previous;
             }
             queueOperations.AddFirst(e);
         }
 
         void OnSourceCreated(object sender, FileSystemEventArgs e)
         {
-            queueOperations.AddFirst(e);
             Console.WriteLine($"Source file created: {e.FullPath}");
+            queueOperations.AddFirst(e);
         }
 
         void OnSourceChanged(object sender, FileSystemEventArgs e)
         {
+            Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
             if ((File.GetAttributes(e.FullPath) & FileAttributes.Directory) == FileAttributes.Directory) return;
             queueOperations.AddFirst(e);
-            Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
         }
 
         void OnSourceDeleted(object sender, FileSystemEventArgs e)
         {
-            queueOperations.AddFirst(e);
             Console.WriteLine($"Source file deleted: {e.FullPath}");
+            queueOperations.AddFirst(e);
         }
 
         internal void Synchronize()
@@ -114,7 +125,7 @@
 
         void CreateFile(FileSystemEventArgs operation, string destinationRootPath)
         {
-            if ((FileAttributes.Directory & File.GetAttributes(operation.FullPath)) == FileAttributes.Directory)
+            if (operation.FullPath.IsDirectory())
             {
                 Directory.CreateDirectory(destinationRootPath.File(operation.Name));
                 return;
@@ -131,24 +142,26 @@
 
         void DeleteFile(FileSystemEventArgs operation, string destinationRootPath)
         {
-            if ((FileAttributes.Directory & File.GetAttributes(destinationRootPath.File(operation.Name))) == FileAttributes.Directory)
+            if (destinationRootPath.File(operation.Name).IsDirectory())
             {
                 Directory.Delete(destinationRootPath.File(operation.Name));
                 return;
             }
+
             File.Delete(destinationRootPath.File(operation.Name));
         }
 
         void RenameFile(RenamedEventArgs operation, string destinationRootPath)
         {
-            if ((FileAttributes.Directory & File.GetAttributes(operation.FullPath)) == FileAttributes.Directory)
+            if (operation.FullPath.IsDirectory())
             {
                 Directory.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
                 return;
             }
+
             FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
-            fileInfo.Directory.Create();
-            File.Move(operation.FullPath, destinationRootPath.File(operation.Name));
+            fileInfo.Directory.Create(); // Create the subdirectories if necessary
+            File.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
         }
         internal int GetSynchronizationInterval()
         {

@@ -83,8 +83,8 @@
 
         void OnSourceChanged(object sender, FileSystemEventArgs e)
         {
-            Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
             if ((File.GetAttributes(e.FullPath) & FileAttributes.Directory) == FileAttributes.Directory) return;
+            Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
             queueOperations.AddFirst(e);
         }
 

@@ -10,6 +10,6 @@
         public static bool IsDirectory(this string path)
         {
             return (FileAttributes.Directory & System.IO.File.GetAttributes(path)) == FileAttributes.Directory;
-        })
+        }
     }
 }

@@ -11,6 +11,20 @@
             this.parameters = parameters;
             this.queueOperations = new LinkedList<FileSystemEventArgs>();
             SetupSourceWatcher();
+            InitialSynchronization();
+        }
+
+        void InitialSynchronization()
+        {
+            Console.WriteLine("Performing initial synchronization...");
+            foreach (string sourceFilePath in Directory.GetFiles(parameters.SourcePath, "*", SearchOption.AllDirectories))
+            {
+                string relativePath = Path.GetRelativePath(parameters.SourcePath, sourceFilePath);
+                string destinationFilePath = Path.Combine(parameters.DestinationPath, relativePath);
+                Directory.CreateDirectory(Path.GetDirectoryName(destinationFilePath));
+                File.Copy(sourceFilePath, destinationFilePath, overwrite: true);
+            }
+            Console.WriteLine("Initial synchronization completed.");
         }
 
         void SetupSourceWatcher()
@@ -40,9 +54,9 @@
             while (currentNode != null)
             {
                 FileSystemEventArgs current = currentNode.Value;
-                if (current.ChangeType == WatcherChangeTypes.Created && current.FullPath == e.OldFullPath)
+                if (current.ChangeType == WatcherChangeTypes.Created && current.Name == e.OldName)
                 {
-                    currentNode.Value = e;
+                    currentNode.Value = new FileSystemEventArgs(current.ChangeType, GetSourcePath(), e.Name);
                     return;
                 }
                 currentNode = currentNode.Next;
@@ -58,6 +72,7 @@
 
         void OnSourceChanged(object sender, FileSystemEventArgs e)
         {
+            if ((File.GetAttributes(e.FullPath) & FileAttributes.Directory) == FileAttributes.Directory) return;
             queueOperations.AddFirst(e);
             Console.WriteLine($"Source file {e.ChangeType}: {e.FullPath}");
         }
@@ -99,6 +114,13 @@
 
         void CreateFile(FileSystemEventArgs operation, string destinationRootPath)
         {
+            if ((FileAttributes.Directory & File.GetAttributes(operation.FullPath)) == FileAttributes.Directory)
+            {
+                Directory.CreateDirectory(destinationRootPath.File(operation.Name));
+                return;
+            }
+            FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
+            fileInfo.Directory.Create();
             File.Copy(operation.FullPath, destinationRootPath.File(operation.Name));
         }
 
@@ -109,13 +131,24 @@
 
         void DeleteFile(FileSystemEventArgs operation, string destinationRootPath)
         {
+            if ((FileAttributes.Directory & File.GetAttributes(destinationRootPath.File(operation.Name))) == FileAttributes.Directory)
+            {
+                Directory.Delete(destinationRootPath.File(operation.Name));
+                return;
+            }
             File.Delete(destinationRootPath.File(operation.Name));
         }
 
         void RenameFile(RenamedEventArgs operation, string destinationRootPath)
         {
-            if (!File.Exists(destinationRootPath)) File.Create(destinationRootPath.File(operation.Name)).Close();
-            else File.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
+            if ((FileAttributes.Directory & File.GetAttributes(operation.FullPath)) == FileAttributes.Directory)
+            {
+                Directory.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
+                return;
+            }
+            FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
+            fileInfo.Directory.Create();
+            File.Move(operation.FullPath, destinationRootPath.File(operation.Name));
         }
         internal int GetSynchronizationInterval()
         {

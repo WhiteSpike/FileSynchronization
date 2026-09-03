@@ -52,27 +52,32 @@
         {
             Console.WriteLine($"Source file renamed from {e.OldFullPath} to {e.FullPath}");
             LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.Last;
+            bool foundCreate = false;
+            bool foundRenamed = false;
             while (currentNode != null)
             {
                 FileSystemEventArgs current = currentNode.Value;
                 if (current.Name != e.OldName) continue;
                     switch (current.ChangeType)
                 {
-                    case WatcherChangeTypes.Created:
+                    default:
                         {
                             currentNode.Value = new FileSystemEventArgs(current.ChangeType, GetSourcePath(), e.Name);
-                            return;
+                            if (current.ChangeType == WatcherChangeTypes.Created) foundCreate = true;
+                            break;
                         }
                     case WatcherChangeTypes.Renamed:
                         {
                             RenamedEventArgs currentRenamed = current as RenamedEventArgs;
                             currentNode.Value = new RenamedEventArgs(current.ChangeType, GetSourcePath(), e.Name, currentRenamed.OldName);
-                            return;
+                            foundRenamed = true;
+                            break;
                         }
+
                 }
                 currentNode = currentNode.Previous;
             }
-            queueOperations.AddFirst(e);
+            if (!foundCreate && !foundRenamed) queueOperations.AddFirst(e);
         }
 
         void OnSourceCreated(object sender, FileSystemEventArgs e)
@@ -91,6 +96,15 @@
         void OnSourceDeleted(object sender, FileSystemEventArgs e)
         {
             Console.WriteLine($"Source file deleted: {e.FullPath}");
+            LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.Last;
+            while (currentNode != null)
+            {
+                FileSystemEventArgs current = currentNode.Value;
+                if (current.Name != e.Name) continue;
+
+                queueOperations.Remove(currentNode);
+                currentNode = currentNode.Previous;
+            }
             queueOperations.AddFirst(e);
         }
 

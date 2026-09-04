@@ -169,6 +169,7 @@
 
         void ChangeFile(FileSystemEventArgs operation, string destinationRootPath)
         {
+            if (operation.FullPath.IsDirectory()) return;
             File.Copy(operation.FullPath, destinationRootPath.File(operation.Name), overwrite: true);
             logger.Log(string.Format(LogMessages.SYNC_FILE_CHANGED, operation.FullPath));
         }

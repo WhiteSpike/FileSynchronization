@@ -23,6 +23,9 @@ namespace FileSynchronization
         internal const string SYNC_FILE_CHANGED = "File change synchronization: {0}";
         internal const string SYNC_FILE_DELETED = "File delete synchronization: {0}";
         internal const string SYNC_FILE_RENAMED = "File rename synchronization: from {0} to {1}";
+        internal const string SYNC_FOLDER_CREATED = "Folder create synchronization: {0}";
+        internal const string SYNC_FOLDER_DELETED = "Folder delete synchronization: {0}";
+        internal const string SYNC_FOLDER_RENAMED = "Folder rename synchronization: from {0} to {1}";
 
         internal const string WRONG_ARGUMENTS_ERROR = "Error: Provided arguments were not valid.\n Use the following format:\n \"FileSynchronization <sourcePath> <replicaPath> <synchronizationInterval> <logFilePath>\"";
         internal const string SOURCE_PATH_ERROR = "Error: Provided source directory folder path ({0}) does not exist.";

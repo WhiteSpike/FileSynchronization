@@ -13,7 +13,10 @@
         {
             string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {message}";
             Console.WriteLine(logEntry);
-            File.AppendAllText(logFilePath, logEntry + Environment.NewLine);
+            using (StreamWriter writer = new(logFilePath, append: true))
+            {
+                writer.WriteLine(logEntry);
+            }
         }
     }
 }

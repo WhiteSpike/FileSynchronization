@@ -20,14 +20,19 @@
         void InitialSynchronization()
         {
             logger.Log(LogMessages.INITIAL_SYNC_START);
-            foreach (string sourceFilePath in Directory.GetFiles(parameters.SourcePath, "*", SearchOption.AllDirectories))
+            CopyAllFilesInDirectory(parameters.SourcePath, parameters.DestinationPath);
+            logger.Log(LogMessages.INITIAL_SYNC_END);
+        }
+
+        void CopyAllFilesInDirectory(string sourceDirectory, string destinationDirectory)
+        {
+            foreach (string sourceFilePath in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
             {
-                string relativePath = Path.GetRelativePath(parameters.SourcePath, sourceFilePath);
-                string destinationFilePath = Path.Combine(parameters.DestinationPath, relativePath);
+                string relativePath = Path.GetRelativePath(sourceDirectory, sourceFilePath);
+                string destinationFilePath = Path.Combine(destinationDirectory, relativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(destinationFilePath));
                 File.Copy(sourceFilePath, destinationFilePath, overwrite: true);
             }
-            logger.Log(LogMessages.INITIAL_SYNC_END);
         }
 
         void SetupSourceWatcher()
@@ -47,9 +52,14 @@
             sourceWatcher.Changed += OnSourceChanged;
             sourceWatcher.Deleted += OnSourceDeleted;
             sourceWatcher.Renamed += OnSourceRenamed;
+            sourceWatcher.Error += OnSourceError;
             sourceWatcher.IncludeSubdirectories = true;
             sourceWatcher.EnableRaisingEvents = true;
         }   
+        void OnSourceError(object sender, ErrorEventArgs e)
+        {
+            logger.Log(e.GetException().Message);
+        }
 
         void OnSourceRenamed(object sender, RenamedEventArgs e)
         {
@@ -92,7 +102,6 @@
 
         void OnSourceChanged(object sender, FileSystemEventArgs e)
         {
-            if ((File.GetAttributes(e.FullPath) & FileAttributes.Directory) == FileAttributes.Directory) return;
             logger.Log(string.Format(LogMessages.FILE_CHANGED, e.FullPath));
             queueOperations.AddFirst(e);
         }
@@ -103,11 +112,12 @@
             LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.Last;
             while (currentNode != null)
             {
+                LinkedListNode<FileSystemEventArgs> it = currentNode;
                 FileSystemEventArgs current = currentNode.Value;
+                currentNode = currentNode.Previous;
                 if (current.Name != e.Name) continue;
 
-                queueOperations.Remove(currentNode);
-                currentNode = currentNode.Previous;
+                queueOperations.Remove(it);
             }
             queueOperations.AddFirst(e);
         }
@@ -147,6 +157,8 @@
             if (operation.FullPath.IsDirectory())
             {
                 Directory.CreateDirectory(destinationRootPath.File(operation.Name));
+                CopyAllFilesInDirectory(operation.FullPath, destinationRootPath.File(operation.Name));
+                logger.Log(string.Format(LogMessages.SYNC_FOLDER_CREATED, operation.FullPath));
                 return;
             }
             FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
@@ -166,6 +178,7 @@
             if (destinationRootPath.File(operation.Name).IsDirectory())
             {
                 Directory.Delete(destinationRootPath.File(operation.Name), recursive: true);
+                logger.Log(string.Format(LogMessages.SYNC_FOLDER_DELETED, operation.FullPath));
                 return;
             }
 
@@ -178,13 +191,14 @@
             if (operation.FullPath.IsDirectory())
             {
                 Directory.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
+                logger.Log(string.Format(LogMessages.SYNC_FOLDER_RENAMED, operation.OldFullPath, operation.FullPath));
                 return;
             }
 
             FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
             fileInfo.Directory.Create(); // Create the subdirectories if necessary
             File.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
-            logger.Log(string.Format(LogMessages.SYNC_FILE_RENAMED, operation.FullPath));
+            logger.Log(string.Format(LogMessages.SYNC_FILE_RENAMED, operation.OldFullPath, operation.FullPath));
         }
         internal int GetSynchronizationInterval()
         {

@@ -42,7 +42,7 @@
         {
             if (!Directory.Exists(directoryPath))
             {
-                Console.Error.WriteLine($"Error: Provided source directory folder path ({directoryPath}) does not exist.");
+                Console.Error.WriteLine(string.Format(LogMessages.SOURCE_PATH_ERROR, directoryPath));
                 return PATH_ERROR;
             }
             return directoryPath;
@@ -51,7 +51,7 @@
         {
             if (!Directory.Exists(directoryPath))
             {
-                Console.WriteLine($"Info: Provided destination directory folder path ({directoryPath}) does not exist. Creating it now.");
+                Console.WriteLine(string.Format(LogMessages.DESTINATION_PATH_INFO, directoryPath));
                 Directory.CreateDirectory(directoryPath);
             }
             return directoryPath;
@@ -60,12 +60,12 @@
         {
             if (!int.TryParse(interval, out int result))
             {
-                Console.Error.WriteLine($"Error: Provided synchronization interval ({interval}) is not a valid integer.");
+                Console.Error.WriteLine(string.Format(LogMessages.INTERVAL_ERROR, interval));
                 return -1;
             }
             if (result <= 0)
             {
-                Console.Error.WriteLine($"Error: Provided synchronization interval ({interval}) must be a positive integer.");
+                Console.Error.WriteLine(string.Format(LogMessages.INTERVAL_NEGATIVE_ERROR, interval));
                 return -1;
             }
             return result * 1000; // Convert seconds to milliseconds
@@ -76,7 +76,7 @@
             FileInfo logFileInfo = new FileInfo(logFilePath);
             if (!logFileInfo.Directory.Exists)
             {
-                Console.WriteLine($"Info: Directories in the provided log file path do not exist. Creating them now.");
+                Console.WriteLine(string.Format(LogMessages.LOG_FILE_PATH_INFO, logFilePath));
                 logFileInfo.Directory.Create();
             }
             return logFilePath;

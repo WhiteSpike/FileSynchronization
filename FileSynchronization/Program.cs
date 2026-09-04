@@ -22,8 +22,8 @@ class Program
         FileSynchronizer synchronizer = new(arguments);
         for(;;)
         {
-            synchronizer.Synchronize();
             synchronizer.Rest();
+            synchronizer.Synchronize();
         }
     }
 }

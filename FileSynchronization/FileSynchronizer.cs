@@ -5,18 +5,21 @@
         CommandLineArguments parameters;
         FileSystemWatcher sourceWatcher;
         LinkedList<FileSystemEventArgs> queueOperations;
+        Logger logger;
 
         public FileSynchronizer(CommandLineArguments parameters)
         {
             this.parameters = parameters;
             this.queueOperations = new LinkedList<FileSystemEventArgs>();
+            this.logger = new Logger(parameters.LogFilePath);
             SetupSourceWatcher();
             InitialSynchronization();
+            logger.Log(LogMessages.SYNCHRONIZER_INITIALIZED);
         }
 
         void InitialSynchronization()
         {
-            Console.WriteLine(LogMessages.INITIAL_SYNC_START);
+            logger.Log(LogMessages.INITIAL_SYNC_START);
             foreach (string sourceFilePath in Directory.GetFiles(parameters.SourcePath, "*", SearchOption.AllDirectories))
             {
                 string relativePath = Path.GetRelativePath(parameters.SourcePath, sourceFilePath);
@@ -24,7 +27,7 @@
                 Directory.CreateDirectory(Path.GetDirectoryName(destinationFilePath));
                 File.Copy(sourceFilePath, destinationFilePath, overwrite: true);
             }
-            Console.WriteLine(LogMessages.INITIAL_SYNC_END);
+            logger.Log(LogMessages.INITIAL_SYNC_END);
         }
 
         void SetupSourceWatcher()
@@ -50,7 +53,7 @@
 
         void OnSourceRenamed(object sender, RenamedEventArgs e)
         {
-            Console.WriteLine(string.Format(LogMessages.FILE_RENAMED, e.OldFullPath, e.FullPath));
+            logger.Log(string.Format(LogMessages.FILE_RENAMED, e.OldFullPath, e.FullPath));
             LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.Last;
             bool foundCreate = false;
             bool foundRenamed = false;
@@ -83,20 +86,20 @@
 
         void OnSourceCreated(object sender, FileSystemEventArgs e)
         {
-            Console.WriteLine(string.Format(LogMessages.FILE_CREATED, e.FullPath));
+            logger.Log(string.Format(LogMessages.FILE_CREATED, e.FullPath));
             queueOperations.AddFirst(e);
         }
 
         void OnSourceChanged(object sender, FileSystemEventArgs e)
         {
             if ((File.GetAttributes(e.FullPath) & FileAttributes.Directory) == FileAttributes.Directory) return;
-            Console.WriteLine(string.Format(LogMessages.FILE_CHANGED, e.FullPath));
+            logger.Log(string.Format(LogMessages.FILE_CHANGED, e.FullPath));
             queueOperations.AddFirst(e);
         }
 
         void OnSourceDeleted(object sender, FileSystemEventArgs e)
         {
-            Console.WriteLine(string.Format(LogMessages.FILE_DELETED, e.FullPath));
+            logger.Log(string.Format(LogMessages.FILE_DELETED, e.FullPath));
             LinkedListNode<FileSystemEventArgs> currentNode = queueOperations.Last;
             while (currentNode != null)
             {
@@ -111,7 +114,7 @@
 
         internal void Synchronize()
         {
-            Console.WriteLine(LogMessages.SYNC_START);
+            logger.Log(LogMessages.SYNC_START);
             while (queueOperations.Count > 0)
             {
                 FileSystemEventArgs operation = queueOperations.Last.Value;
@@ -136,7 +139,7 @@
                         break;
                 }
             }
-            Console.WriteLine(LogMessages.SYNC_END);
+            logger.Log(LogMessages.SYNC_END);
         }
 
         void CreateFile(FileSystemEventArgs operation, string destinationRootPath)
@@ -149,13 +152,13 @@
             FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
             fileInfo.Directory.Create();
             File.Copy(operation.FullPath, destinationRootPath.File(operation.Name));
-            Console.WriteLine(string.Format(LogMessages.SYNC_FILE_CREATED, operation.FullPath));
+            logger.Log(string.Format(LogMessages.SYNC_FILE_CREATED, operation.FullPath));
         }
 
         void ChangeFile(FileSystemEventArgs operation, string destinationRootPath)
         {
             File.Copy(operation.FullPath, destinationRootPath.File(operation.Name), overwrite: true);
-            Console.WriteLine(string.Format(LogMessages.SYNC_FILE_CHANGED, operation.FullPath));
+            logger.Log(string.Format(LogMessages.SYNC_FILE_CHANGED, operation.FullPath));
         }
 
         void DeleteFile(FileSystemEventArgs operation, string destinationRootPath)
@@ -167,7 +170,7 @@
             }
 
             File.Delete(destinationRootPath.File(operation.Name));
-            Console.WriteLine(string.Format(LogMessages.SYNC_FILE_DELETED, operation.FullPath));
+            logger.Log(string.Format(LogMessages.SYNC_FILE_DELETED, operation.FullPath));
         }
 
         void RenameFile(RenamedEventArgs operation, string destinationRootPath)
@@ -181,7 +184,7 @@
             FileInfo fileInfo = new FileInfo(destinationRootPath.File(operation.Name));
             fileInfo.Directory.Create(); // Create the subdirectories if necessary
             File.Move(destinationRootPath.File(operation.OldName), destinationRootPath.File(operation.Name));
-            Console.WriteLine(string.Format(LogMessages.SYNC_FILE_RENAMED, operation.FullPath));
+            logger.Log(string.Format(LogMessages.SYNC_FILE_RENAMED, operation.FullPath));
         }
         internal int GetSynchronizationInterval()
         {
